@@ -1,0 +1,166 @@
+
+#include "LOG.hpp"
+#include <vector>
+
+#include "firebase/app.h"
+#include "firebase/database.h"
+
+void Log(const firebase::Variant& variant, unsigned long indentLevel = 0);
+void ReadNode(const std::string& node_name, firebase::database::Database* database = nullptr);
+
+firebase::Variant glob_variant;
+
+int main() {
+
+    firebase::AppOptions options; {
+        options.set_api_key("AIzaSyCmnrOkK_9qZtF0fWRrnofqZ3b9KI_rMyc");
+        options.set_app_id("105740420520");
+        options.set_project_id("app1-d3365");
+        options.set_messaging_sender_id("1:105740420520:web:bc6d0d8562e9cffd32c99d");
+        options.set_database_url("https://app1-d3365-default-rtdb.asia-southeast1.firebasedatabase.app");
+        options.set_storage_bucket("app1-d3365.appspot.com");
+    }
+    firebase::App* app = firebase::App::Create(options);
+    LOG("\n(+) FireBase is Set");
+    firebase::database::Database* database = firebase::database::Database::GetInstance(app);
+    LOG("\n(+) Database is Set");
+
+    //auto root_ref = database->GetReference("arr");
+
+
+    std::map<firebase::Variant, firebase::Variant> v;
+    std::vector<firebase::Variant> vv{ 0,1,1,2,3,5,8 };
+
+    firebase::Variant message_data(vv);
+    //root_ref.SetValue(message_data);
+
+
+    /*root_ref.PushChild().SetValue(0);
+    for (int64_t i = 0, a = 0, b = 1; i < 40; i++) {
+        int64_t sum = a + b;
+        a = b;
+        b = sum;
+        root_ref.PushChild().SetValue(firebase::Variant(sum));
+    } LOG("\n(+) Message  is Sent");*/
+
+    ReadNode("arr", database);
+
+
+    LOG("\n\n----------------------------\n");
+    Log(glob_variant);
+    while(1)
+    {
+        if (glob_variant.is_map())
+        {
+            vv.clear();
+            vv.reserve(glob_variant.map().size());
+
+
+            LOG("\n\nMap: ");
+            for (auto& [key, val] : glob_variant.map())
+            {
+                if (val.is_int64() == false)
+                    break;
+
+                double v = val.int64_value();
+                LOG(v << ", ");
+                vv.emplace_back(v);
+            }
+
+            database->GetReference("array1").SetValue(vv);
+
+
+            goto Exit;
+        }
+        else LOG("\nnope");
+    }
+
+Exit:
+    std::cin.get();
+}
+
+void Log(const firebase::Variant& variant, unsigned long indentLevel)
+{
+    if (variant.is_int64()) {
+        int value = variant.int64_value();
+        LOG_TAB(indentLevel);
+        LOG("int64: " << value << "\n");
+    }
+    else if (variant.is_double()) {
+        double value = variant.double_value();
+        LOG_TAB(indentLevel);
+        LOG("double: " << value << "\n");
+    }
+    else if (variant.is_string()) {
+        const std::string& value = variant.string_value();
+        LOG_TAB(indentLevel);
+        LOG("string: " << value << "\n");
+    }
+    else if (variant.is_bool()) {
+        bool value = variant.bool_value();
+        LOG_TAB(indentLevel);
+        LOG("bool: " << value << "\n");
+    }
+    else if (variant.is_map()) {
+        const std::map<firebase::Variant, firebase::Variant>& value = variant.map();
+
+        LOG_TAB(indentLevel); LOG("Map(" << value.size() << "):\n");
+        for (const auto& [key, val] : value)
+        {
+            LOG_TAB(indentLevel+1); LOG("key:\n"); Log(key, indentLevel + 1);
+            LOG_TAB(indentLevel+1); LOG("val:\n"); Log(val, indentLevel + 1);
+            LOG("\n")
+        }
+    }
+    else if (variant.is_vector()) {
+        const std::vector<firebase::Variant>& value = variant.vector();
+
+        LOG_TAB(indentLevel);
+        LOG("Vector(" << value.size() << "):\n");
+        for (const auto& v : value)
+            Log(v, indentLevel + 1);
+    }
+    else {
+        // Handle unsupported or unexpected data type
+        LOG_TAB(indentLevel);
+        LOG("Invalid Type: " << firebase::Variant::TypeName(variant.type()));
+    }
+}
+
+void ReadNode(const std::string& node_name, firebase::database::Database* database)
+{
+    if (!database) return ;
+    LOG("\n\nNode (" << node_name << "):\n");
+
+    firebase::database::DatabaseReference node_ref = database->GetReference(node_name.c_str());
+
+    node_ref.GetValue().OnCompletion([](const firebase::Future<firebase::database::DataSnapshot>& result) {
+        if (result.status() == firebase::kFutureStatusComplete)
+        {
+            //const firebase::Variant& variant = result.result()->value();
+            //Log(variant);
+            glob_variant = result.result()->value();
+
+
+            /*LOG("\n\n----------------------------\n");
+            Log(glob_variant);
+            if (glob_variant.is_map()
+                ) {
+
+                LOG("\n\nMap: ");
+                for (auto& [key, val] : glob_variant.map())
+                {
+                    if (val.is_int64() == false)
+                        break;
+
+                    double v = val.int64_value();
+                    LOG(v << ", ");
+                }
+
+            }
+            else LOG("nope");*/
+
+
+        }
+        });
+}
